@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vani - Chatbot</title>
+<style>
+  /* ---------- THEME COLOURS (greyish white + light pink) ---------- */
+  :root {
+    --bg1: #f1f2f5;
+    --bg2: #d9dce3;
+    --panel: #f7f7f9;
+    --bot-bubble: #fde6ee;
+    --user-bubble: linear-gradient(135deg, #f8bfd3, #f1a1bd);
+    --text: #33343d;
+    --muted: #8a8c99;
+    --accent: #e27a9f;
+    --accent2: #f1a1bd;
+    --border: rgba(60, 60, 80, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    color: var(--text);
+    background: radial-gradient(circle at 20% 20%, var(--bg1), var(--bg2) 80%);
+  }
+
+  /* ---------- CHAT CARD ---------- */
+  .chat {
+    width: 100%;
+    max-width: 440px;
+    height: 92vh;
+    max-height: 720px;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: 0 10px 40px rgba(70, 70, 100, 0.18);
+    overflow: hidden;
+  }
+
+  /* ---------- HEADER ---------- */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    background: linear-gradient(90deg, #ececf0, #fbe9f0);
+    border-bottom: 1px solid var(--border);
+  }
+  .avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    box-shadow: 0 4px 12px rgba(226, 122, 159, 0.4);
+  }
+  .header h1 { font-size: 17px; letter-spacing: 0.5px; color: var(--text); }
+  .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4cc98a; box-shadow: 0 0 6px #4cc98a; }
+  .clear-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .clear-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- MESSAGES ---------- */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .messages::-webkit-scrollbar { width: 6px; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 6px; }
+
+  .msg { max-width: 80%; animation: pop 0.25s ease; }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .bubble {
+    padding: 11px 15px;
+    font-size: 14.5px;
+    line-height: 1.45;
+    word-wrap: break-word;
+    white-space: pre-line;      /* NEW: lets \n create new lines (needed for game messages) */
+  }
+  .time { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+
+  .bot  { align-self: flex-start; }
+  .bot .bubble {
+    background: var(--bot-bubble);
+    border-radius: 18px 18px 18px 4px;
+    border: 1px solid rgba(226, 122, 159, 0.15);
+    color: var(--text);
+  }
+  .user { align-self: flex-end; text-align: right; }
+  .user .bubble {
+    background: var(--user-bubble);
+    border-radius: 18px 18px 4px 18px;
+    box-shadow: 0 4px 14px rgba(226, 122, 159, 0.3);
+    text-align: left;
+    color: #3a2430;
+  }
+
+  /* typing indicator */
+  .typing .bubble { display: flex; gap: 5px; padding: 14px 16px; }
+  .typing span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* ---------- QUICK CHIPS ---------- */
+  .chips {
+    display: flex;
+    gap: 8px;
+    padding: 0 18px 10px;
+    overflow-x: auto;
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    white-space: nowrap;
+    background: #fff;
+    border: 1px solid rgba(226, 122, 159, 0.5);
+    color: var(--accent);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .chip:hover { background: var(--accent); color: #fff; }
+
+  /* ---------- INPUT BAR ---------- */
+  .input-bar {
+    display: flex;
+    gap: 10px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+    background: #ececf0;
+  }
+  .input-bar input {
+    flex: 1;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 12px 18px;
+    color: var(--text);
+    font-size: 14.5px;
+    outline: none;
+  }
+  .input-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(226, 122, 159, 0.2); }
+  .input-bar input::placeholder { color: var(--muted); }
+  .send {
+    width: 46px; height: 46px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    color: white;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    box-shadow: 0 4px 12px rgba(226, 122, 159, 0.45);
+    transition: transform 0.15s;
+  }
+  .send:hover { transform: scale(1.08); }
+</style>
+</head>
+<body>
+
+<div class="chat">
+  <div class="header">
+    <div class="avatar">🤖</div>
+    <div>
+      <h1>Vani Chatbot</h1>
+      <div class="status"><span class="dot"></span> Online</div>
+    </div>
+    <button class="clear-btn" id="clearBtn">Clear</button>
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <!-- chips are now created by JavaScript (see setChips) so they can change during games -->
+  <div class="chips" id="chips"></div>
+
+  <form class="input-bar" id="form">
+    <input type="text" id="input" placeholder="Type a message..." autocomplete="off">
+    <button class="send" type="submit">➤</button>
+  </form>
+</div>
+
+<script>
+  // ---------- SETTINGS ----------
+  const botName = "Vani";
+  let userName = "";
+
+  // keyword -> list of possible replies (add more here!)
+  const replies = {
+    "hello":        ["Hello there! 👋", "Hey! Nice to see you.", "Hi! How can I help?"],
+    "hey":          ["Hey! What's up?", "Hey there!"],
+    "hi":           ["Hi! 😊", "Hello! How's your day going?"],
+    "how are you":  ["I'm doing great, thanks for asking!", "All good, just chatting with you!"],
+    "your name":    ["I'm " + botName + ", your chatbot.", "People call me " + botName + "."],
+    "help":         ["Try: hello, how are you, time, date, joke, game, 'my name is ...', or a calculation like 12*5+3.",
+                     "I can chat, tell time and date, crack jokes, play games, remember your name and do maths!"],
+    "joke":         ["Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
+                     "Why did the developer go broke? He used up all his cache! 💸"],
+    "thank":        ["You're welcome! 😊", "Happy to help!"],
+    "who made you": ["A first-year BTech student built me as a workshop project! 🚀"]
+  };
+
+  // ---------- GAME SETTINGS (NEW) ----------
+  // gameState tells the bot what is happening right now:
+  //   null     -> normal chat
+  //   "choose" -> user must pick a game
+  //   "rps"    -> playing Rock Paper Scissors
+  //   "guess"  -> playing Guess the Number
+  let gameState = null;
+  let score = { you: 0, bot: 0, draw: 0 };   // Rock Paper Scissors score
+  let secret = 0;                            // secret number for the guessing game
+  let tries = 0;                             // how many guesses used
+  const MAX_TRIES = 7;
+
+  const rpsEmoji = { rock: "🪨", paper: "📄", scissors: "✂️" };
+
+  // chips (label = what user sees, value = what gets sent)
+  const defaultChips = [
+    { label: "hello",        value: "hello" },
+    { label: "game 🎮",      value: "game" },
+    { label: "what is your name", value: "what is your name" },
+    { label: "time",         value: "time" },
+    { label: "date",         value: "date" },
+    { label: "joke",         value: "joke" },
+    { label: "12*5+3",       value: "12*5+3" },
+    { label: "help",         value: "help" }
+  ];
+  const gameMenuChips = [
+    { label: "✊ Rock Paper Scissors", value: "rock paper scissors" },
+    { label: "🔢 Guess the Number",   value: "guess the number" },
+    { label: "❌ Quit",               value: "quit" }
+  ];
+  const rpsChips = [
+    { label: "🪨 Rock",     value: "rock" },
+    { label: "📄 Paper",    value: "paper" },
+    { label: "✂️ Scissors", value: "scissors" },
+    { label: "❌ Quit",     value: "quit" }
+  ];
+  const guessChips = [
+    { label: "❌ Quit", value: "quit" }
+  ];
+
+  // ---------- HELPERS ----------
+  const messagesEl = document.getElementById("messages");
+  const inputEl = document.getElementById("input");
+  const chipsEl = document.getElementById("chips");
+
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+  function nowTime() {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function addMessage(text, who) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + who;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;            // textContent keeps it safe
+    const time = document.createElement("div");
+    time.className = "time";
+    time.textContent = nowTime();
+    wrap.appendChild(bubble);
+    wrap.appendChild(time);
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg bot typing";
+    wrap.id = "typing";
+    wrap.innerHTML = '<div class="bubble"><span></span><span></span><span></span></div>';
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    const t = document.getElementById("typing");
+    if (t) t.remove();
+  }
+
+  // NEW: replace the chip buttons with a different list
+  function setChips(list) {
+    chipsEl.innerHTML = "";
+    list.forEach((c) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip";
+      btn.textContent = c.label;
+      btn.dataset.value = c.value;
+      chipsEl.appendChild(btn);
+    });
+  }
+
+  // ---------- GAMES (NEW) ----------
+  function startGameMenu() {
+    gameState = "choose";
+    setChips(gameMenuChips);
+    return "Let's play a game! 🎮 Choose one:\n1. Rock Paper Scissors\n2. Guess the Number\n\nTap a button below, or type 1 or 2. Type 'quit' to exit.";
+  }
+
+  function exitGame(message) {
+    gameState = null;
+    setChips(defaultChips);
+    return message;
+  }
+
+  // after a game finishes, go back to the game menu
+  function backToMenu(message) {
+    gameState = "choose";
+    setChips(gameMenuChips);
+    return message + "\n\nWant to play again? Pick a game, or type 'quit'.";
+  }
+
+  // ----- Rock Paper Scissors -----
+  function startRPS() {
+    gameState = "rps";
+    score = { you: 0, bot: 0, draw: 0 };
+    setChips(rpsChips);
+    return "Rock Paper Scissors it is! ✊✋✌️\nPick rock, paper or scissors (you can also type r, p or s).";
+  }
+
+  function playRPS(move) {
+    const botMove = pick(["rock", "paper", "scissors"]);
+    let result;
+
+    if (move === botMove) {
+      result = "It's a draw! 🤝";
+      score.draw++;
+    } else if (
+      (move === "rock" && botMove === "scissors") ||
+      (move === "paper" && botMove === "rock") ||
+      (move === "scissors" && botMove === "paper")
+    ) {
+      result = "You win this round! 🎉";
+      score.you++;
+    } else {
+      result = botName + " wins this round! 😎";
+      score.bot++;
+    }
+
+    return "You: " + rpsEmoji[move] + " " + move + "\n" +
+           botName + ": " + rpsEmoji[botMove] + " " + botMove + "\n" +
+           result + "\n" +
+           "Score → You " + score.you + " | " + botName + " " + score.bot + " | Draws " + score.draw;
+  }
+
+  // ----- Guess the Number -----
+  function startGuess() {
+    gameState = "guess";
+    secret = Math.floor(Math.random() * 100) + 1;   // 1 to 100
+    tries = 0;
+    setChips(guessChips);
+    return "I'm thinking of a number between 1 and 100 🤔\nYou have " + MAX_TRIES + " tries. Type your guess!";
+  }
+
+  function playGuess(lower) {
+    if (!/^\d+$/.test(lower)) return "Please type a whole number between 1 and 100.";
+    const guess = Number(lower);
+    if (guess < 1 || guess > 100) return "Stay between 1 and 100 please! 😄";
+
+    tries++;
+
+    if (guess === secret) {
+      return backToMenu("🎉 Correct! The number was " + secret + ". You got it in " + tries + (tries === 1 ? " try!" : " tries!"));
+    }
+    if (tries >= MAX_TRIES) {
+      return backToMenu("Out of tries! 😅 The number was " + secret + ". Better luck next time!");
+    }
+
+    const left = MAX_TRIES - tries;
+    const hint = guess < secret ? "Too low! Try a higher number ⬆️" : "Too high! Try a lower number ⬇️";
+    return hint + "\n(" + left + (left === 1 ? " try" : " tries") + " left)";
+  }
+
+  // decides what to do with a message while a game is active
+  function handleGame(lower) {
+    // quit works everywhere
+    if (/^(quit|exit|stop)$/.test(lower)) {
+      let extra = "";
+      if (gameState === "rps" && score.you + score.bot + score.draw > 0) {
+        extra = "\nFinal score → You " + score.you + " | " + botName + " " + score.bot + " | Draws " + score.draw;
+      }
+      return exitGame("Game closed. Thanks for playing! 👋" + extra);
+    }
+
+    // step 1: choosing a game
+    if (gameState === "choose") {
+      if (/rock|paper|scissor/.test(lower) || lower === "1") return startRPS();
+      if (/guess|number/.test(lower) || lower === "2") return startGuess();
+      return "Please choose: 1 for Rock Paper Scissors or 2 for Guess the Number (or type 'quit').";
+    }
+
+    // step 2a: playing Rock Paper Scissors
+    if (gameState === "rps") {
+      const moves = { r: "rock", rock: "rock", p: "paper", paper: "paper", s: "scissors", scissor: "scissors", scissors: "scissors" };
+      if (moves[lower]) return playRPS(moves[lower]);
+      return "Type rock, paper or scissors (or 'quit' to stop).";
+    }
+
+    // step 2b: playing Guess the Number
+    if (gameState === "guess") {
+      return playGuess(lower);
+    }
+  }
+
+  // ---------- BOT BRAIN ----------
+  function getReply(input) {
+    const lower = input.toLowerCase().trim();
+
+    // NEW: if a game is running, the game handles the message first
+    if (gameState) return handleGame(lower);
+
+    // NEW: the word "game" anywhere in the sentence opens the game menu
+    if (/\bgames?\b/.test(lower)) return startGameMenu();
+
+    // goodbye
+    if (/\bbye\b/.test(lower)) {
+      return userName ? "Goodbye, " + userName + "! See you soon. 👋" : "Goodbye! See you soon. 👋";
+    }
+
+    // remember name
+    const nameMatch = input.match(/my name is\s+(.+)/i);
+    if (nameMatch) {
+      userName = nameMatch[1].trim();
+      return "Nice to meet you, " + userName + "! 😊";
+    }
+    if (lower.includes("who am i")) {
+      return userName ? "You are " + userName + "!" : "I don't know yet. Tell me with 'my name is ...'";
+    }
+
+    // time and date
+    if (/\btime\b/.test(lower)) {
+      return "The time is " + new Date().toLocaleTimeString() + " ⏰";
+    }
+    if (/\b(date|today)\b/.test(lower)) {
+      return "Today is " + new Date().toLocaleDateString("en-IN", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric"
+      }) + " 📅";
+    }
+
+    // calculator: e.g. "12*5+3" or "calculate 40/8"
+    const calc = lower.replace(/^(calc|calculate)\s*/, "");
+    if (/^[\d\s+\-*/().%]+$/.test(calc) && /[+\-*/%]/.test(calc)) {
+      try {
+        const result = Function('"use strict"; return (' + calc + ")")();
+        if (Number.isFinite(result)) return calc.trim() + " = " + result + " 🧮";
+      } catch (e) { /* fall through to fallback */ }
+      return "That calculation looks wrong. Try something like 12*5+3.";
+    }
+
+    // keyword matching
+    for (const key in replies) {
+      if (new RegExp("\\b" + key).test(lower)) {
+        return pick(replies[key]);
+      }
+    }
+
+    // fallback
+    return "I didn't understand, can you rephrase? Type 'help' to see what I can do.";
+  }
+
+  // ---------- SEND FLOW ----------
+  function send(text) {
+    if (!text.trim()) return;
+    addMessage(text, "user");
+    showTyping();
+    setTimeout(() => {
+      hideTyping();
+      addMessage(getReply(text), "bot");
+    }, 600 + Math.random() * 500);        // small delay feels natural
+  }
+
+  document.getElementById("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    send(inputEl.value);
+    inputEl.value = "";
+  });
+
+  // quick-reply chips (one listener handles all chips, even the ones created later)
+  chipsEl.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (chip) send(chip.dataset.value);
+  });
+
+  // clear chat (also resets any running game)
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    messagesEl.innerHTML = "";
+    gameState = null;
+    setChips(defaultChips);
+    welcome();
+  });
+
+  function welcome() {
+    addMessage("Hi, I'm " + botName + "! 🤖 Say hello, type 'game' to play with me, or tap a suggestion below.", "bot");
+  }
+
+  setChips(defaultChips);
+  welcome();
+  inputEl.focus();
+</script>
+</body>
+</html>
