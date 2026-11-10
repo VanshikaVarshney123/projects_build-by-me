@@ -1,0 +1,378 @@
+/* ==========================================================================
+ * Project: Temple Run (Console Edition)
+ * Concepts Used:
+ *   1. Pointers & Pointer Arithmetic (*(ptr + i))
+ *   2. Dynamic Memory: malloc(), calloc(), free()
+ *   3. Functions & Pass-by-Reference
+ *   4. Menu Driven Architecture with switch-case
+ *   5. Standard I/O (printf, scanf, getchar)
+ * ========================================================================== */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_ROUNDS 20     /* Maximum number of rounds tracked in history */
+#define NAME_LENGTH 50    /* Maximum characters allowed for player name */
+
+/* --------------------------------------------------------------------------
+ * Function Prototypes (Declaring functions before main)
+ * -------------------------------------------------------------------------- */
+void clear_screen(void);
+void clear_input_buffer(void);
+void show_welcome_screen(void);
+void show_instructions(void);
+void generate_obstacle(char *obstacle_desc, char *correct_action, int distance);
+int  play_round(const char *player_name, int *final_score);
+void record_score(int *history, int *round_count, int score);
+void show_history(const int *history, int total_rounds);
+
+/* --------------------------------------------------------------------------
+ * Function: clear_screen
+ * Purpose:  Clears the console screen using standard ANSI escape codes
+ *           so the game re-renders cleanly without scrolling clutter.
+ * -------------------------------------------------------------------------- */
+void clear_screen(void) {
+    printf("\033[H\033[J");
+}
+
+/* --------------------------------------------------------------------------
+ * Function: clear_input_buffer
+ * Purpose:  Removes extra characters or leftover newline '\n' from stdin
+ *           so subsequent scanf or getchar calls do not get skipped.
+ * -------------------------------------------------------------------------- */
+void clear_input_buffer(void) {
+    int ch;
+    while ((ch = getchar()) != '\n' && ch != EOF);
+}
+
+/* --------------------------------------------------------------------------
+ * Function: show_welcome_screen
+ * Purpose:  Displays an opening splash screen and pauses the program
+ *           until the user presses the ENTER key to start.
+ * -------------------------------------------------------------------------- */
+void show_welcome_screen(void) {
+    clear_screen();
+    printf("==============================================================\n");
+    printf("              🔥 TEMPLE RUN : ANCIENT ESCAPE 🔥               \n");
+    printf("==============================================================\n");
+    printf("  You have snatched the cursed Golden Idol from the shrine!\n");
+    printf("  The Temple Demon has awakened and is sprinting right behind!\n");
+    printf("--------------------------------------------------------------\n");
+    printf("  * Dodge fire pits, duck under logs, and dodge giant rocks.\n");
+    printf("  * You have 3 Hearts (❤️❤️❤️) before the demon catches you!\n");
+    printf("==============================================================\n\n");
+    
+    /* Prompts user and pauses execution using getchar() until Enter is pressed */
+    printf("        >>>> Press [ENTER] to Start the Game <<<<\n");
+    getchar();
+}
+
+/* --------------------------------------------------------------------------
+ * Function: show_instructions
+ * Purpose:  Displays game rules, controls, and scoring logic.
+ * -------------------------------------------------------------------------- */
+void show_instructions(void) {
+    clear_screen();
+    printf("\n============== GAME CONTROLS & RULES ==============\n");
+    printf(" When an obstacle approaches, type the correct key:\n");
+    printf("   [J] = JUMP  over low fire pits\n");
+    printf("   [S] = SLIDE under fallen tree logs\n");
+    printf("   [L] = DODGE LEFT away from boulders on right\n");
+    printf("   [R] = DODGE RIGHT away from boulders on left\n");
+    printf("---------------------------------------------------\n");
+    printf(" * Correct move  : +15 meters distance and +20 points.\n");
+    printf(" * Gold Idol Coin: Appears randomly for +30 bonus points!\n");
+    printf(" * Wrong move    : You stumble and lose 1 Heart.\n");
+    printf(" * 0 Hearts left : Game Over!\n");
+    printf("===================================================\n");
+    printf("Press Enter to return to the menu...");
+    getchar();
+}
+
+/* --------------------------------------------------------------------------
+ * Function: generate_obstacle
+ * Purpose:  Uses POINTERS to return two outputs:
+ *           1. obstacle_desc : Description of the danger ahead.
+ *           2. correct_action: Character ('J', 'S', 'L', 'R') that dodges it.
+ * -------------------------------------------------------------------------- */
+void generate_obstacle(char *obstacle_desc, char *correct_action, int distance) {
+    int roll = rand() % 4; /* Random number between 0 and 3 */
+
+    if (roll == 0) {
+        strcpy(obstacle_desc, "🔥 FIRE PIT AHEAD!");
+        *correct_action = 'J'; /* Required action: Jump */
+    } else if (roll == 1) {
+        strcpy(obstacle_desc, "🪵 LOW TREE LOG!");
+        *correct_action = 'S'; /* Required action: Slide */
+    } else if (roll == 2) {
+        strcpy(obstacle_desc, "🪨 BOULDER ON RIGHT!");
+        *correct_action = 'L'; /* Required action: Dodge Left */
+    } else {
+        strcpy(obstacle_desc, "🪨 BOULDER ON LEFT!");
+        *correct_action = 'R'; /* Required action: Dodge Right */
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Function: play_round
+ * Purpose:  Runs one full gameplay session.
+ *           Uses pointer *final_score to send the earned score back to main.
+ * -------------------------------------------------------------------------- */
+int play_round(const char *player_name, int *final_score) {
+    int distance = 0;
+    int score = 0;
+    int coins = 0;
+    int lives = 3; /* Player starts with 3 Hearts */
+    char user_move;
+
+    while (lives > 0) {
+        clear_screen();
+
+        char obstacle_text[50];
+        char required_key;
+
+        /* Call function using pointers to get obstacle info */
+        generate_obstacle(obstacle_text, &required_key, distance);
+
+        /* 50% chance of a bonus coin appearing */
+        int coin_present = (rand() % 2 == 0);
+
+        /* Display Game HUD (Heads-Up Display) */
+        printf("======================================================\n");
+        printf(" RUNNER: %-12s | DISTANCE: %-5dm | SCORE: %d\n", player_name, distance, score);
+        printf(" LIVES : ");
+        for (int i = 0; i < lives; i++) printf("❤️  ");
+        printf(" | COINS: %d\n", coins);
+        printf("======================================================\n\n");
+
+        /* ASCII Art Representation of the corridor */
+        printf("               |                  |\n");
+        printf("      DANGER:  | %-16s |\n", obstacle_text);
+        if (coin_present) {
+            printf("      BONUS:   |  💰 GOLD COIN!   |\n");
+        } else {
+            printf("               |                  |\n");
+        }
+        printf("               |        🏃        |\n");
+        printf("               |__________________|\n\n");
+
+        /* Prompt user for reflexive move */
+        printf("REACT FAST! Choose your action:\n");
+        printf(" [J] Jump  |  [S] Slide  |  [L] Dodge Left  |  [R] Dodge Right\n");
+        printf("Enter move: ");
+
+        if (scanf(" %c", &user_move) != 1) {
+            clear_input_buffer();
+            continue;
+        }
+        clear_input_buffer();
+
+        /* Convert lowercase input to uppercase */
+        if (user_move >= 'a' && user_move <= 'z') {
+            user_move -= 32;
+        }
+
+        /* Check if player chose the right action */
+        if (user_move == required_key) {
+            distance += 15;
+            score += 20;
+
+            if (coin_present) {
+                coins++;
+                score += 30;
+                printf("\n✨ PERFECT! You dodged cleanly and picked up a Gold Coin! (+50 pts)\n");
+            } else {
+                printf("\n💨 SAFE! You dodged the danger gracefully! (+20 pts)\n");
+            }
+        } else {
+            lives--; /* Deduct one life */
+            printf("\n💥 OUCH! Wrong reflex! You hit the obstacle and stumbled!\n");
+            printf("Lives Remaining: %d\n", lives);
+        }
+
+        printf("\nPress [ENTER] to continue running...");
+        getchar();
+    }
+
+    /* Game Over sequence when lives drop to 0 */
+    clear_screen();
+    printf("\n======================================================\n");
+    printf("         💀 GAME OVER! THE DEMON CAUGHT YOU! 💀       \n");
+    printf("======================================================\n");
+    printf(" Runner Name      : %s\n", player_name);
+    printf(" Total Distance   : %d meters\n", distance);
+    printf(" Coins Collected  : %d\n", coins);
+    printf(" Final Score      : %d points\n", score);
+    printf("======================================================\n\n");
+
+    /* Dereference pointer to store final score in caller variable */
+    *final_score = score;
+    return score;
+}
+
+/* --------------------------------------------------------------------------
+ * Function: record_score
+ * Purpose:  Stores score into dynamically allocated array using
+ *           POINTER ARITHMETIC (*(history + *round_count)).
+ * -------------------------------------------------------------------------- */
+void record_score(int *history, int *round_count, int score) {
+    if (*round_count < MAX_ROUNDS) {
+        /* Pointer arithmetic equivalent to history[*round_count] = score */
+        *(history + *round_count) = score;
+        (*round_count)++; /* Increment total rounds played via pointer */
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Function: show_history
+ * Purpose:  Traverses the calloc-allocated score array using pointer arithmetic.
+ * -------------------------------------------------------------------------- */
+void show_history(const int *history, int total_rounds) {
+    clear_screen();
+    printf("\n================ SCORE HISTORY ================\n");
+    if (total_rounds == 0) {
+        printf("No runs recorded yet. Start a run from the menu!\n");
+    } else {
+        int best_score = 0;
+        for (int i = 0; i < total_rounds; i++) {
+            /* Reading memory address via pointer arithmetic: *(history + i) */
+            int current_run_score = *(history + i);
+            printf("  Run #%2d : %d pts\n", i + 1, current_run_score);
+            if (current_run_score > best_score) {
+                best_score = current_run_score;
+            }
+        }
+        printf("-----------------------------------------------\n");
+        printf("Total Runs Completed : %d\n", total_rounds);
+        printf("All-Time High Score  : %d pts\n", best_score);
+    }
+    printf("===============================================\n");
+    printf("Press Enter to return to the menu...");
+    getchar();
+}
+
+/* --------------------------------------------------------------------------
+ * Function: main
+ * Purpose:  Coordinates memory allocation, menus, and program lifecycle.
+ * -------------------------------------------------------------------------- */
+int main(void) {
+    /* Seed pseudo-random generator with current clock time */
+    srand((unsigned int)time(NULL));
+
+    /* ----------------------------------------------------------------------
+     * STEP 1: Dynamic Allocation using malloc()
+     * Allocates 50 bytes on Heap memory for player name string.
+     * ---------------------------------------------------------------------- */
+    char *player_name = (char *)malloc(NAME_LENGTH * sizeof(char));
+
+    /* Check if malloc failed (returned NULL) */
+    if (player_name == NULL) {
+        printf("Memory allocation failed for player_name!\n");
+        return 1;
+    }
+
+    /* ----------------------------------------------------------------------
+     * STEP 2: Dynamic Allocation using calloc()
+     * Allocates contiguous memory on Heap and automatically zeroes out all bytes.
+     * ---------------------------------------------------------------------- */
+    int *score_history = (int *)calloc(MAX_ROUNDS, sizeof(int));
+
+    /* Check if calloc failed (returned NULL) */
+    if (score_history == NULL) {
+        printf("Memory allocation failed for score_history!\n");
+        free(player_name); /* Clean up previously allocated block */
+        return 1;
+    }
+
+    /* ----------------------------------------------------------------------
+     * STEP 3: Show opening welcome screen with "Press ENTER to Start"
+     * ---------------------------------------------------------------------- */
+    show_welcome_screen();
+
+    /* ----------------------------------------------------------------------
+     * STEP 4: Input Player Name
+     * ---------------------------------------------------------------------- */
+    clear_screen();
+    printf("Enter your runner name: ");
+    if (scanf("%49s", player_name) != 1) {
+        strcpy(player_name, "Runner");
+    }
+    clear_input_buffer();
+
+    int menu_choice;
+    int round_count = 0;
+    int current_score = 0;
+
+    /* ----------------------------------------------------------------------
+     * STEP 5: Main Menu Loop (switch-case architecture)
+     * ---------------------------------------------------------------------- */
+    do {
+        clear_screen();
+        printf("=========================================\n");
+        printf("        🔥 TEMPLE RUN : MAIN MENU 🔥      \n");
+        printf("=========================================\n");
+        printf(" Active Runner : %s\n", player_name);
+        printf(" 1. Start Sprint (Play Game)\n");
+        printf(" 2. Game Instructions & Controls\n");
+        printf(" 3. View Score Leaderboard\n");
+        printf(" 4. Exit Game\n");
+        printf("=========================================\n");
+        printf("Enter your choice (1-4): ");
+
+        if (scanf("%d", &menu_choice) != 1) {
+            clear_input_buffer();
+            continue;
+        }
+        clear_input_buffer();
+
+        switch (menu_choice) {
+            case 1: {
+                char play_again;
+                /* Inner loop for 'Play Again?' functionality */
+                do {
+                    /* Pass address &current_score into function */
+                    play_round(player_name, &current_score);
+
+                    /* Record score using pointer arithmetic */
+                    record_score(score_history, &round_count, current_score);
+
+                    printf("Do you want to run again, %s? (y/n): ", player_name);
+                    scanf(" %c", &play_again);
+                    clear_input_buffer();
+                } while (play_again == 'y' || play_again == 'Y');
+                break;
+            }
+
+            case 2:
+                show_instructions();
+                break;
+
+            case 3:
+                show_history(score_history, round_count);
+                break;
+
+            case 4:
+                clear_screen();
+                printf("Thanks for playing Temple Run, %s! Stay safe from the demon!\n", player_name);
+                break;
+
+            default:
+                break;
+        }
+    } while (menu_choice != 4);
+
+    /* ----------------------------------------------------------------------
+     * STEP 6: Memory Deallocation using free()
+     * Releases Heap memory back to the Operating System to prevent memory leaks.
+     * ---------------------------------------------------------------------- */
+    free(player_name);
+    free(score_history);
+
+    /* Set pointers to NULL to eliminate dangling pointers */
+    player_name = NULL;
+    score_history = NULL;
+
+    return 0;
+}
